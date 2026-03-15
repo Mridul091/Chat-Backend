@@ -11,9 +11,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserResponse)
 async def register(user_Data: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = await UserRepository.get_user_by_email(db, user_Data.email)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
+    existing_username = await UserRepository.get_user_by_username(db, user_Data.username)
+    if existing_user or existing_username:
+        raise HTTPException(status_code=400, detail="Email or usernamec already registered")
+    print(f"Registering user: {user_Data.email}")
     hashed_password = hash_password(user_Data.password)
 
     new_user = User(
@@ -30,7 +31,7 @@ async def login(user_data: UserLogin, response: Response, db: AsyncSession = Dep
     user = await UserRepository.get_user_by_email(db, user_data.email)
     if not user:
         raise HTTPException(status_code=400, detail="Invalid email or password")
-    
+    print("Logging in user:", user_data.email)
     if not verify_password(user_data.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid email or password")
     
@@ -41,8 +42,8 @@ async def login(user_data: UserLogin, response: Response, db: AsyncSession = Dep
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=False,  # set True in production (HTTPS only)
+        samesite="lax",
         max_age=7*24*60*60  # 7 days
     )
     return Token(access_token=access_token, token_type="bearer")
@@ -65,8 +66,8 @@ async def refresh(response: Response, refresh_token: str = Cookie(default=None),
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=False,  # set True in production (HTTPS only)
+        samesite="lax",
         max_age=7*24*60*60  # 7 days
     )
     return Token(access_token=new_access_token, token_type="bearer")

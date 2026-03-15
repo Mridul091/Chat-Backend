@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.conversation import Conversation
 from app.models.conversation_member import ConversationMember
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.sql import func
 
 
 class ConversationRepository:
@@ -33,6 +34,7 @@ class ConversationRepository:
         await db.refresh(member)
         return member
 
+    @staticmethod
     async def is_member(db: AsyncSession, conversation_id: int, user_id: int) -> bool:
         result = await db.execute(
             select(ConversationMember).where(
@@ -41,3 +43,15 @@ class ConversationRepository:
             )
         )
         return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def mark_conversation_read(db: AsyncSession, conversation_id: int, user_id: int):
+        await db.execute(
+            update(ConversationMember)
+            .where(
+                ConversationMember.conversation_id == conversation_id,
+                ConversationMember.user_id == user_id
+            )
+            .values(last_read_at=func.now())
+        )
+        await db.commit()

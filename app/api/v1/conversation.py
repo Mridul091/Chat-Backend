@@ -80,10 +80,28 @@ async def get_messages(
     conversation_id: int,
     limit: int = 20,
     offset: int = 0,
+    since: str = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied")
+        
+    if since:
+        # Fetch only messages created after the provided timestamp
+        return await MessageRepository.get_messages_since(db, conversation_id, since)
+        
     return await MessageRepository.get_messages(db, conversation_id, limit, offset)
+
+@router.post("/{conversation_id}/read")
+async def mark_conversation_read(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    await ConversationRepository.mark_conversation_read(db, conversation_id, current_user.id)
+    return {"message": "Conversation marked as read"}
 

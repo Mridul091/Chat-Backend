@@ -10,6 +10,7 @@ class ConversationMember(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_read_at = Column(DateTime(timezone=True), server_default=func.now())
 
     conversation = relationship("Conversation", back_populates="members")
     user = relationship("User", back_populates="conversations")
