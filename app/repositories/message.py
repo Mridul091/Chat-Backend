@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.message import Message
 from sqlalchemy import select, cast, DateTime
 from datetime import datetime
-
+from fastapi import HTTPException
 class MessageRepository:
 
     async def create_message(db: AsyncSession, message: Message):
@@ -25,14 +25,12 @@ class MessageRepository:
     async def get_messages_since(db: AsyncSession, conversation_id: int, since: str):
         # Convert string to datetime object to pass to PostgreSQL
         try:
-            # Handle standard ISO format from JS: 2026-03-14T10:00:00.000Z
             if since.endswith('Z'):
                 since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
             else:
                 since_dt = datetime.fromisoformat(since)
         except ValueError:
-            # Fallback if the parser fails, though Pydantic usually handles this at the route level
-            since_dt = since
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
 
         result = await db.execute(
             select(Message)

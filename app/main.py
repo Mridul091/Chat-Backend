@@ -1,11 +1,43 @@
 from pathlib import Path
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import health, db_test, auth, conversation
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+from app.api.v1 import health, auth, conversation
 from app.websocket.router import router as ws_router
+from app.core.limiter import limiter
+from app.core.logger import logger
 
 app = FastAPI(title="Chat-Backend")
+
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start_time = time.time()
+    
+    # Process the request
+    response = await call_next(request)
+    
+    process_time_ms = round((time.time() - start_time) * 1000, 2)
+    
+    # Ignore logging for static files or favicon to avoid spam
+    if not request.url.path.startswith("/static") and request.url.path != "/favicon.ico":
+        logger.info(
+            "access_log",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=process_time_ms,
+            client_ip=request.client.host if request.client else None
+        )
+        
+    return response
+
+# Attach the SlowAPI limiter state and error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,12 +50,12 @@ app.add_middleware(
         "http://127.0.0.1:5173"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
+
 app.include_router(health.router, prefix="/api/v1")
-app.include_router(db_test.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(conversation.router, prefix="/api/v1")
 app.include_router(ws_router)
