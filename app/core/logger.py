@@ -1,6 +1,7 @@
 import logging
 import sys
 import structlog
+from app.core.config import settings
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
 def setup_logging():
@@ -29,7 +30,7 @@ def setup_logging():
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             # Render logs in a beautiful console format for development
-            structlog.dev.ConsoleRenderer()
+            structlog.dev.ConsoleRenderer() if settings.ENVIRONMENT == "development" else structlog.processors.JSONRenderer()
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
