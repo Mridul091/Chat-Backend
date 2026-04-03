@@ -1,6 +1,7 @@
 import logging
 import sys
 import structlog
+from structlog.contextvars import bind_contextvars, clear_contextvars
 
 def setup_logging():
     # Set the base logging config to ensure everything is caught

@@ -30,3 +30,6 @@ postgres_data/
 # coverage
 .coverage
 htmlcov/
+
+frontend
+static
