@@ -42,7 +42,7 @@ jobs:
 
     env:
       # These are used by pydantic-settings when the app loads in tests
-      DATABASE_URL: sqlite+aiosqlite:///:memory:
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       SECRET_KEY: ci-test-secret-key-not-for-production
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
