@@ -11,7 +11,8 @@ from slowapi import _rate_limit_exceeded_handler
 from app.api.v1 import health, auth, conversation
 from app.websocket.router import router as ws_router
 from app.core.limiter import limiter
-from app.core.logger import logger, bind_contextvars, clear_contextvars
+from app.core.logger import logger
+from structlog.contextvars import bind_contextvars, clear_contextvars
 from app.core.error_handler import validation_exception_handler, unhandled_exception_handler
 
 app = FastAPI(title="Chat-Backend")

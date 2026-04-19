@@ -9,5 +9,6 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()

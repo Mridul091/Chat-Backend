@@ -1,0 +1,98 @@
+name: CI/CD Pipeline
+
+# Trigger on push or PR to main/master
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Docker image pushed to GitHub Container Registry
+env:
+  DOCKER_IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+
+  # ── Job 1: Lint ─────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Check code style
+        run: ruff check app/
+
+      - name: Check formatting
+        run: ruff format --check app/
+
+
+  # ── Job 2: Test ─────────────────────────────────────────────────────────────
+  test:
+    name: Test (pytest + SQLite)
+    runs-on: ubuntu-latest
+    needs: lint   # only run if lint passes
+
+    env:
+      # These are used by pydantic-settings when the app loads in tests
+      DATABASE_URL: sqlite+aiosqlite:///:memory:
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ENVIRONMENT: development
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run tests
+        run: poetry run pytest tests/ -v --tb=short
+
+
+  # ── Job 3: Build & Push Docker Image ────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test  # only run if tests pass
+
+    # Only build on actual pushes to main/master — not on PRs
+    if: github.event_name == 'push'
+
+    permissions:
+      contents: read
+      packages: write   # needed to push to GHCR
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}

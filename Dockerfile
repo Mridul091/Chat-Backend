@@ -28,13 +28,15 @@ COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app
 COPY --from=builder /app/alembic /app/alembic
 COPY --from=builder /app/alembic.ini /app/alembic.ini
+COPY entrypoint.sh /app/entrypoint.sh
 
 RUN groupadd --gid 1001 appgroup && \
     useradd --uid 1001 --gid appgroup --no-create-home appuser && \
+    chmod +x /app/entrypoint.sh && \
     chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 8000
 
-CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/entrypoint.sh"]

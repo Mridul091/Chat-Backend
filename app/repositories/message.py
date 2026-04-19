@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.message import Message
-from sqlalchemy import select, cast, DateTime
+from sqlalchemy import select
 from datetime import datetime
 from fastapi import HTTPException
 class MessageRepository:

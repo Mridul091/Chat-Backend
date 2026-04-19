@@ -8,6 +8,15 @@ from app.core.database import Base, get_db
 from app.main import app
 
 
+from app.models.user import User
+from app.models.conversation import Conversation
+from app.models.conversation_member import ConversationMember
+from app.models.message import Message
+
+from app.core.limiter import limiter
+limiter.enabled = False
+
+
 # In-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -20,7 +29,6 @@ TestSessionLocal = sessionmaker(
 )
 
 
-# Override the get_db dependency to use test DB
 async def override_get_db():
     async with TestSessionLocal() as session:
         yield session
