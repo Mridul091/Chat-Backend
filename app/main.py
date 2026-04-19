@@ -1,9 +1,8 @@
-from pathlib import Path
 import time
 import uuid
 
 from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
@@ -31,7 +30,7 @@ async def logging_middleware(request: Request, call_next):
     response = await call_next(request)
     process_time_ms = round((time.time() - start_time) * 1000, 2)
 
-    if not request.url.path.startswith("/static") and request.url.path != "/favicon.ico":
+    if request.url.path != "/favicon.ico":
         logger.info(
             "access_log",
             method=request.method,
@@ -70,7 +69,3 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(conversation.router, prefix="/api/v1")
 app.include_router(ws_router)
-
-# Serve the test frontend at /static/index.html
-static_dir = Path(__file__).resolve().parent.parent / "static"
-app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
