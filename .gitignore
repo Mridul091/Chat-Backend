@@ -31,8 +31,6 @@ postgres_data/
 .coverage
 htmlcov/
 
-# Frontend
-frontend
 
 # Old test frontend
 static/

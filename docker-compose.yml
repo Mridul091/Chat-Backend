@@ -7,8 +7,10 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - frontend_build:/usr/share/nginx/html:ro
     depends_on:
       - api
+      - frontend
 
   api:
     build: .
@@ -53,5 +55,12 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    build: ./frontend
+    container_name: chat_frontend_build
+    volumes:
+      - frontend_build:/dist
+
 volumes:
   postgres_data:
+  frontend_build:
