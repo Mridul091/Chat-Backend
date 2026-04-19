@@ -18,10 +18,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     return JSONResponse(
         status_code=422,
-        content=jsonable_encoder({
-            "detail": exc.errors(),
-            "body": exc.body,
-        }),
+        content=jsonable_encoder(
+            {
+                "detail": exc.errors(),
+                "body": exc.body,
+            }
+        ),
     )
 
 
@@ -32,7 +34,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error(
         "unhandled_exception",
         path=request.url.path,
-        exc_info=True,      
+        exc_info=True,
         request_id=request_id,
     )
 

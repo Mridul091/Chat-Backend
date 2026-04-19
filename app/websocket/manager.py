@@ -3,6 +3,7 @@ from fastapi import WebSocket
 import time
 from collections import defaultdict
 
+
 class ConnectionManager:
     def __init__(self):
         self.rooms: dict[int, set[WebSocket]] = {}
@@ -34,14 +35,19 @@ class ConnectionManager:
             for ws in self.active_users[user_id]:
                 await ws.send_json(data)
 
-    def check_rate_limit(self, user_id: int, max_messages: int = 5, time_window: float = 1.0) -> bool:
+    def check_rate_limit(
+        self, user_id: int, max_messages: int = 5, time_window: float = 1.0
+    ) -> bool:
         now = time.time()
-        self.rate_limits[user_id] = [t for t in self.rate_limits[user_id] if now - t < time_window]
-        
+        self.rate_limits[user_id] = [
+            t for t in self.rate_limits[user_id] if now - t < time_window
+        ]
+
         if len(self.rate_limits[user_id]) >= max_messages:
-            return False # Rate limit exceeded
-            
+            return False  # Rate limit exceeded
+
         self.rate_limits[user_id].append(now)
         return True
+
 
 manager = ConnectionManager()

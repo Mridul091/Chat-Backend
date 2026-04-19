@@ -3,15 +3,18 @@ from app.models.message import Message
 from sqlalchemy import select
 from datetime import datetime
 from fastapi import HTTPException
-class MessageRepository:
 
+
+class MessageRepository:
     async def create_message(db: AsyncSession, message: Message):
         db.add(message)
         await db.commit()
         await db.refresh(message)
         return message
 
-    async def get_messages(db: AsyncSession, conversation_id: int, limit: int = 20, offset: int = 0):
+    async def get_messages(
+        db: AsyncSession, conversation_id: int, limit: int = 20, offset: int = 0
+    ):
         result = await db.execute(
             select(Message)
             .where(Message.conversation_id == conversation_id)
@@ -25,8 +28,8 @@ class MessageRepository:
     async def get_messages_since(db: AsyncSession, conversation_id: int, since: str):
         # Convert string to datetime object to pass to PostgreSQL
         try:
-            if since.endswith('Z'):
-                since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+            if since.endswith("Z"):
+                since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
             else:
                 since_dt = datetime.fromisoformat(since)
         except ValueError:
@@ -36,8 +39,9 @@ class MessageRepository:
             select(Message)
             .where(
                 Message.conversation_id == conversation_id,
-                Message.created_at > since_dt
-            ).order_by(Message.created_at.asc())
+                Message.created_at > since_dt,
+            )
+            .order_by(Message.created_at.asc())
         )
 
         return result.scalars().all()

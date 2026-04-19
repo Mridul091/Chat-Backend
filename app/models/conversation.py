@@ -3,6 +3,7 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 from sqlalchemy.orm import relationship
 
+
 class Conversation(Base):
     __tablename__ = "conversations"
 
@@ -15,11 +16,9 @@ class Conversation(Base):
     members = relationship(
         "ConversationMember",
         back_populates="conversation",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     messages = relationship(
-        "Message",
-        back_populates="conversation",
-        cascade="all, delete-orphan"
+        "Message", back_populates="conversation", cascade="all, delete-orphan"
     )

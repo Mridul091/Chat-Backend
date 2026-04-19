@@ -5,7 +5,11 @@ from app.models.user import User
 from app.models.message import Message
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
-from app.schemas.conversation import ConversationCreate, ConversationResponse, MemberAddRequest
+from app.schemas.conversation import (
+    ConversationCreate,
+    ConversationResponse,
+    MemberAddRequest,
+)
 from app.schemas.message import MessageCreate, MessageResponse
 from app.services.conversation import create_conversation_with_members
 from app.core.dependencies import get_current_user
@@ -44,7 +48,9 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    conversation = await ConversationRepository.get_conversation_by_id(db, conversation_id)
+    conversation = await ConversationRepository.get_conversation_by_id(
+        db, conversation_id
+    )
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
@@ -89,7 +95,7 @@ async def send_message(
 @router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
 @limiter.limit("60/minute")
 async def get_messages(
-    request: Request,   
+    request: Request,
     conversation_id: int,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -99,12 +105,13 @@ async def get_messages(
 ):
     if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied")
-        
+
     if since:
         # Fetch only messages created after the provided timestamp
         return await MessageRepository.get_messages_since(db, conversation_id, since)
-        
+
     return await MessageRepository.get_messages(db, conversation_id, limit, offset)
+
 
 @router.post("/{conversation_id}/read")
 @limiter.limit("60/minute")
@@ -116,7 +123,8 @@ async def mark_conversation_read(
 ):
     if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied")
-        
-    await ConversationRepository.mark_conversation_read(db, conversation_id, current_user.id)
-    return {"message": "Conversation marked as read"}
 
+    await ConversationRepository.mark_conversation_read(
+        db, conversation_id, current_user.id
+    )
+    return {"message": "Conversation marked as read"}

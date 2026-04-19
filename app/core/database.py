@@ -6,7 +6,7 @@ from app.core.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,   # checks stale connections safely
+    pool_pre_ping=True,  # checks stale connections safely
 )
 
 AsyncSessionLocal = sessionmaker(

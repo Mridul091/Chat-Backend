@@ -3,6 +3,7 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 from sqlalchemy.orm import relationship
 
+
 class ConversationMember(Base):
     __tablename__ = "conversation_members"
 
@@ -15,6 +16,4 @@ class ConversationMember(Base):
     conversation = relationship("Conversation", back_populates="members")
     user = relationship("User", back_populates="conversations")
 
-    __table_args__ = (
-        UniqueConstraint("conversation_id", "user_id"),
-    )
+    __table_args__ = (UniqueConstraint("conversation_id", "user_id"),)

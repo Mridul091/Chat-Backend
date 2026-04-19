@@ -3,6 +3,7 @@ import sys
 import structlog
 from app.core.config import settings
 
+
 def setup_logging():
     # Set the base logging config to ensure everything is caught
     logging.basicConfig(
@@ -29,7 +30,9 @@ def setup_logging():
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             # Render logs in a beautiful console format for development
-            structlog.dev.ConsoleRenderer() if settings.ENVIRONMENT == "development" else structlog.processors.JSONRenderer()
+            structlog.dev.ConsoleRenderer()
+            if settings.ENVIRONMENT == "development"
+            else structlog.processors.JSONRenderer(),
         ],
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -37,9 +40,9 @@ def setup_logging():
         cache_logger_on_first_use=True,
     )
 
+
 # Run the setup once
 setup_logging()
 
 # Create the global logger instance
 logger = structlog.get_logger()
-

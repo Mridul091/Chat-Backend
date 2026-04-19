@@ -14,9 +14,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
 
     conversations = relationship(
-        "ConversationMember",
-        back_populates="user",
-        cascade="all, delete-orphan"
+        "ConversationMember", back_populates="user", cascade="all, delete-orphan"
     )
 
     messages = relationship("Message", back_populates="sender")
