@@ -34,3 +34,10 @@ htmlcov/
 
 # Old test frontend
 static/
+
+id_rsa
+id_ed25519
+*.pem
+*.key
+sshKey
+sshKey.pub

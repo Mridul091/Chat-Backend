@@ -99,3 +99,35 @@ jobs:
           tags: |
             ${{ env.DOCKER_IMAGE }}:latest
             ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+
+
+  # ── Job 4: Deploy to DigitalOcean ───────────────────────────────────────────
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push   # only deploy if image was built successfully
+
+    # Only deploy on pushes to main/master — not on PRs
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /home/deploy/Chat-Backend
+
+            # Pull latest code
+            git pull origin master
+
+            # Pull the new Docker image from GHCR
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api
+
+            # Restart only the api container (zero downtime for other services)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api
+
+            # Remove old unused images to save disk space
+            docker image prune -f
