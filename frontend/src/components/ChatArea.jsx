@@ -6,6 +6,7 @@ export default function ChatArea({ conversation, currentUser }) {
   const [input, setInput] = useState('');
   const [wsStatus, setWsStatus] = useState('disconnected');
   const [typingUsers, setTypingUsers] = useState(new Set());
+  const [onlineUsers, setOnlineUsers] = useState(new Set());
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatMessagesRef = useRef(null);
@@ -77,6 +78,18 @@ export default function ChatArea({ conversation, currentUser }) {
           setTypingUsers((prev) => {
             const next = new Set(prev);
             next.delete(data.sender_id);
+        } else if (data.type === 'user_online') {
+          if (data.user_id !== currentUser?.id) {
+            setOnlineUsers((prev) => new Set(prev).add(data.user_id));
+          }
+        } else if (data.type === 'presence_state') {
+          // Initialize online users list when connecting
+          const others = data.online_users.filter(id => id !== currentUser?.id);
+          setOnlineUsers(new Set(others));
+        } else if (data.type === 'user_offline') {
+          setOnlineUsers((prev) => {
+            const next = new Set(prev);
+            next.delete(data.user_id);
             return next;
           });
         } else if (data.type === 'error') {
@@ -202,7 +215,15 @@ export default function ChatArea({ conversation, currentUser }) {
                 className={`message ${isSent ? 'sent' : 'received'}`}
               >
                 {!isSent && (
-                  <div className="message-sender">User #{msg.sender_id}</div>
+                  <div className="message-sender" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    User #{msg.sender_id}
+                    {onlineUsers.has(msg.sender_id) && (
+                      <div 
+                        style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--success)' }} 
+                        title="Online"
+                      />
+                    )}
+                  </div>
                 )}
                 <div>{msg.content}</div>
                 <div className="message-time">{formatTime(msg.created_at)}</div>
