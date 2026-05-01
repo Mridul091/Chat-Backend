@@ -22,12 +22,14 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
         return
 
     await manager.connect(ws, conversation_id, user_id)
-    
+
     # Send the current list of online users to the newly connected client
     online_users = list(manager.active_users.keys())
     await ws.send_json({"type": "presence_state", "online_users": online_users})
-    
-    await manager.broadcast(conversation_id, {"type": "user_online", "user_id": user_id})
+
+    await manager.broadcast(
+        conversation_id, {"type": "user_online", "user_id": user_id}
+    )
     try:
         while True:
             data = await ws.receive_json()
@@ -86,4 +88,6 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
         manager.disconnect(ws, conversation_id, user_id)
         # Only broadcast offline if the user has no other active tabs open
         if not manager.is_user_online(user_id):
-            await manager.broadcast(conversation_id, {"type": "user_offline", "user_id": user_id})
+            await manager.broadcast(
+                conversation_id, {"type": "user_offline", "user_id": user_id}
+            )
