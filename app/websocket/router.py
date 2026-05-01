@@ -39,13 +39,27 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
                 ):
                     await ws.close(code=1008)
                     return
+                msg_type = data.get("type")
+
+                if msg_type == "typing_start":
+                    await manager.broadcast(
+                        conversation_id,
+                        {"type": "typing_start", "sender_id": user_id},
+                    )
+                    continue
+                if msg_type == "typing_end":
+                    await manager.broadcast(
+                        conversation_id,
+                        {"type": "typing_end", "sender_id": user_id},
+                    )
+                    continue
+
                 content = data.get("content", "").strip()
                 if not content or len(content) > 4000:
                     await ws.send_json(
                         {"type": "error", "message": "Invalid message content."}
                     )
                     continue
-
                 msg = Message(
                     conversation_id=conversation_id, sender_id=user_id, content=content
                 )

@@ -5,9 +5,13 @@ export default function ChatArea({ conversation, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [wsStatus, setWsStatus] = useState('disconnected');
+  const [typingUsers, setTypingUsers] = useState(new Set());
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatMessagesRef = useRef(null);
+  const typingTimeoutRef = useRef({});  // per-user auto-clear timers
+  const typingRef = useRef(false);      // are WE currently marked as typing?
+  const typingSendTimeout = useRef(null); // debounce timer for stop-typing
 
   // Scroll to bottom
   const scrollToBottom = () => {
@@ -46,7 +50,6 @@ export default function ChatArea({ conversation, currentUser }) {
         const data = JSON.parse(event.data);
         if (data.type === 'message') {
           setMessages((prev) => {
-            // Deduplicate by checking if we already have this message
             if (prev.some((m) => m.id === data.id)) return prev;
             return [...prev, {
               id: data.id,
@@ -55,6 +58,26 @@ export default function ChatArea({ conversation, currentUser }) {
               created_at: data.created_at,
               conversation_id: conversation.id,
             }];
+          });
+        } else if (data.type === 'typing_start') {
+          if (data.sender_id !== currentUser?.id) {
+            setTypingUsers((prev) => new Set(prev).add(data.sender_id));
+            // Auto-clear after 3s in case typing_end is never received
+            clearTimeout(typingTimeoutRef.current[data.sender_id]);
+            typingTimeoutRef.current[data.sender_id] = setTimeout(() => {
+              setTypingUsers((prev) => {
+                const next = new Set(prev);
+                next.delete(data.sender_id);
+                return next;
+              });
+            }, 3000);
+          }
+        } else if (data.type === 'typing_end') {
+          clearTimeout(typingTimeoutRef.current[data.sender_id]);
+          setTypingUsers((prev) => {
+            const next = new Set(prev);
+            next.delete(data.sender_id);
+            return next;
           });
         } else if (data.type === 'error') {
           console.warn('WS error:', data.message);
@@ -87,8 +110,33 @@ export default function ChatArea({ conversation, currentUser }) {
     const content = input.trim();
     if (!content || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
-    wsRef.current.send(JSON.stringify({ content }));
+    // Stop typing indicator when message is sent
+    clearTimeout(typingSendTimeout.current);
+    if (typingRef.current) {
+      typingRef.current = false;
+      wsRef.current.send(JSON.stringify({ type: 'typing_end' }));
+    }
+
+    wsRef.current.send(JSON.stringify({ type: 'message', content }));
     setInput('');
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    // Send typing_start only once until we stop typing
+    if (!typingRef.current) {
+      typingRef.current = true;
+      wsRef.current.send(JSON.stringify({ type: 'typing_start' }));
+    }
+
+    // Reset stop-typing timer on every keystroke
+    clearTimeout(typingSendTimeout.current);
+    typingSendTimeout.current = setTimeout(() => {
+      typingRef.current = false;
+      wsRef.current?.send(JSON.stringify({ type: 'typing_end' }));
+    }, 1500);
   };
 
   const formatTime = (dateStr) => {
@@ -165,13 +213,27 @@ export default function ChatArea({ conversation, currentUser }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {typingUsers.size > 0 && (
+        <div style={{
+          padding: '4px 20px 2px',
+          fontSize: 12,
+          color: 'var(--text-muted)',
+          fontStyle: 'italic',
+          minHeight: 20,
+        }}>
+          {typingUsers.size === 1
+            ? `User #${[...typingUsers][0]} is typing...`
+            : `${typingUsers.size} people are typing...`}
+        </div>
+      )}
+
       <div className="chat-input-area">
         <form className="chat-input-wrapper" onSubmit={handleSend}>
           <input
             type="text"
             placeholder="Type a message..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             maxLength={4000}
             autoFocus
           />
