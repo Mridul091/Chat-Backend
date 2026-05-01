@@ -51,7 +51,7 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
                     await manager.broadcast(
                         conversation_id,
                         {"type": "typing_end", "sender_id": user_id},
-                    )  
+                    )
                     continue
 
                 content = data.get("content", "").strip()
