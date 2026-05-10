@@ -20,11 +20,31 @@ export default function ChatLayout() {
 
   useEffect(() => {
     fetchConversations();
+
+    // Poll every 5s so unread badges stay fresh even when not in a conversation
+    const interval = setInterval(fetchConversations, 5000);
+
+    // Also refresh when the user tabs back into the window
+    const onFocus = () => fetchConversations();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const handleConversationCreated = (newConv) => {
     setConversations((prev) => [newConv, ...prev]);
     setActiveConversation(newConv);
+  };
+
+  const handleSelectConversation = (conv) => {
+    setActiveConversation(conv);
+    // Clear unread badge immediately (optimistic update)
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conv.id ? { ...c, unread_count: 0 } : c))
+    );
   };
 
   return (
@@ -33,7 +53,7 @@ export default function ChatLayout() {
         user={user}
         conversations={conversations}
         activeConversation={activeConversation}
-        onSelectConversation={setActiveConversation}
+        onSelectConversation={handleSelectConversation}
         onConversationCreated={handleConversationCreated}
         onLogout={logout}
       />
