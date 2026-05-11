@@ -70,8 +70,27 @@ export default function Sidebar({
                   {conv.type === 'dm' ? 'Direct message' : 'Group chat'}
                 </div>
               </div>
-              <div className="conversation-time">
-                {new Date(conv.created_at).toLocaleDateString()}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <div className="conversation-time">
+                  {new Date(conv.created_at).toLocaleDateString()}
+                </div>
+                {conv.unread_count > 0 && activeConversation?.id !== conv.id && (
+                  <div style={{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                    borderRadius: '999px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    minWidth: 18,
+                    height: 18,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 5px',
+                  }}>
+                    {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                  </div>
+                )}
               </div>
             </div>
           ))

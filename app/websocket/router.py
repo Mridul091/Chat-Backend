@@ -23,9 +23,21 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
 
     await manager.connect(ws, conversation_id, user_id)
 
-    # Send the current list of online users to the newly connected client
+    # Users already in this specific conversation's WS room have already called markRead
+    already_seen = [
+        uid
+        for uid, conns in manager.active_users.items()
+        if uid != user_id
+        and any(c in manager.rooms.get(conversation_id, set()) for c in conns)
+    ]
     online_users = list(manager.active_users.keys())
-    await ws.send_json({"type": "presence_state", "online_users": online_users})
+    await ws.send_json(
+        {
+            "type": "presence_state",
+            "online_users": online_users,
+            "seen_by": already_seen,
+        }
+    )
 
     await manager.broadcast(
         conversation_id, {"type": "user_online", "user_id": user_id}

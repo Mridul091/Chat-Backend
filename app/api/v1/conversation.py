@@ -14,6 +14,7 @@ from app.schemas.message import MessageCreate, MessageResponse
 from app.services.conversation import create_conversation_with_members
 from app.core.dependencies import get_current_user
 from app.core.limiter import limiter
+from app.websocket.manager import manager
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -31,13 +32,26 @@ async def create_conversation(
 
 
 @router.get("/", response_model=list[ConversationResponse])
-@limiter.limit("20/minute")
+@limiter.limit("60/minute")
 async def list_conversations(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await ConversationRepository.get_user_conversations(db, current_user.id)
+    rows = await ConversationRepository.get_user_conversations_with_unread(
+        db, current_user.id
+    )
+    return [
+        ConversationResponse(
+            id=conv.id,
+            title=conv.title,
+            type=conv.type,
+            created_by=conv.created_by,
+            created_at=conv.created_at,
+            unread_count=unread_count,
+        )
+        for conv, unread_count in rows
+    ]
 
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
@@ -126,5 +140,14 @@ async def mark_conversation_read(
 
     await ConversationRepository.mark_conversation_read(
         db, conversation_id, current_user.id
+    )
+    # Broadcast to all members in the conversation so they can show "Seen"
+    await manager.broadcast(
+        conversation_id,
+        {
+            "type": "read_receipt",
+            "conversation_id": conversation_id,
+            "user_id": current_user.id,
+        },
     )
     return {"message": "Conversation marked as read"}

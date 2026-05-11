@@ -19,6 +19,7 @@ class ConversationResponse(BaseModel):
     type: str
     created_by: int
     created_at: datetime
+    unread_count: int = 0
 
     class Config:
         from_attributes = True

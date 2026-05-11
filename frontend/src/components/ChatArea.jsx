@@ -7,6 +7,7 @@ export default function ChatArea({ conversation, currentUser }) {
   const [wsStatus, setWsStatus] = useState("disconnected");
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [seenBy, setSeenBy] = useState(new Set()); // user_ids who have read receipts
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatMessagesRef = useRef(null);
@@ -29,12 +30,15 @@ export default function ChatArea({ conversation, currentUser }) {
 
     setMessages([]);
     setWsStatus("connecting");
+    setSeenBy(new Set());
 
     // Fetch existing messages
     getMessages(conversation.id, 100, 0)
       .then((msgs) => {
         setMessages(msgs);
-        markRead(conversation.id).catch(() => {});
+        // NOTE: markRead is now called after WS presence_state event
+        // to avoid a race condition where the broadcast fires before
+        // the WS auth handshake completes.
       })
       .catch(console.error);
 
@@ -87,20 +91,38 @@ export default function ChatArea({ conversation, currentUser }) {
           if (data.user_id !== currentUser?.id) {
             setOnlineUsers((prev) => new Set(prev).add(data.user_id));
           }
-        } else if (data.type === "presence_state") {
+        } else if (data.type === 'presence_state') {
           // Initialize online users list when connecting
-          const others = data.online_users.filter(
+          const others = (data.online_users || []).filter(
             (id) => id !== currentUser?.id,
           );
           setOnlineUsers(new Set(others));
-        } else if (data.type === "user_offline") {
+          // Initialize seenBy from users already in this WS room (they've read it)
+          const alreadySeen = (data.seen_by || []).filter(
+            (id) => currentUser?.id && id !== currentUser.id,
+          );
+          setSeenBy(new Set(alreadySeen));
+          // WS is now fully authenticated and in the room — safe to call markRead
+          markRead(conversation.id).catch(() => {});
+        } else if (data.type === 'user_offline') {
           setOnlineUsers((prev) => {
             const next = new Set(prev);
             next.delete(data.user_id);
             return next;
           });
-        } else if (data.type === "error") {
-          console.warn("WS error:", data.message);
+          // Also clear seen indicator when user goes offline (logged out)
+          setSeenBy((prev) => {
+            const next = new Set(prev);
+            next.delete(data.user_id);
+            return next;
+          });
+        } else if (data.type === 'error') {
+          console.warn('WS error:', data.message);
+        } else if (data.type === 'read_receipt') {
+          // Guard: ensure currentUser is loaded and we don't add ourselves
+          if (currentUser?.id && data.user_id !== currentUser.id) {
+            setSeenBy((prev) => new Set(prev).add(data.user_id));
+          }
         }
       } catch (err) {
         console.error("WS parse error:", err);
@@ -233,7 +255,13 @@ export default function ChatArea({ conversation, currentUser }) {
             </p>
           </div>
         ) : (
-          messages.map((msg) => {
+          (() => {
+            // Find index of last message sent by current user (for Seen indicator)
+            const lastSentIndex = messages.reduce(
+              (last, msg, idx) => (msg.sender_id === currentUser?.id ? idx : last),
+              -1
+            );
+            return messages.map((msg, index) => {
             const isSent = msg.sender_id === currentUser?.id;
             return (
               <div
@@ -265,9 +293,16 @@ export default function ChatArea({ conversation, currentUser }) {
                 )}
                 <div>{msg.content}</div>
                 <div className="message-time">{formatTime(msg.created_at)}</div>
+                {/* Seen indicator only under the last sent message */}
+                {isSent && index === lastSentIndex && seenBy.size > 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'right', marginTop: 2 }}>
+                    Seen ✓✓
+                  </div>
+                )}
               </div>
             );
           })
+          })()
         )}
         <div ref={messagesEndRef} />
       </div>
