@@ -23,3 +23,11 @@ class UserRepository:
     async def get_user_by_id(db: AsyncSession, user_id: int):
         result = await db.execute(Select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
+
+    async def get_users_by_ids(db: AsyncSession, user_ids: list[int]):
+        result = await db.execute(Select(User).where(User.id.in_(user_ids)))
+        return result.scalars().all()
+
+    async def get_users_by_usernames(db: AsyncSession, usernames: list[str]):
+        result = await db.execute(Select(User).where(User.username.in_(usernames)))
+        return result.scalars().all()

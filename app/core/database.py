@@ -21,3 +21,9 @@ Base = declarative_base()
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+
+def get_session_factory():
+    # WebSocket handlers open short-lived sessions per message instead of
+    # holding one for the whole connection; overridable in tests.
+    return AsyncSessionLocal

@@ -43,7 +43,7 @@ async def test_create_conversation_no_title(client):
     token = await register_and_login(client, "user1@test.com", "user1")
     response = await client.post(
         "/api/v1/conversations/",
-        json={"type": "dm", "member_ids": []},
+        json={"type": "group", "member_ids": []},
         headers=auth_header(token),
     )
     assert response.status_code == 200

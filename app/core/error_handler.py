@@ -6,24 +6,26 @@ from fastapi.responses import JSONResponse
 from app.core.logger import logger
 
 
+def _sanitize_errors(errors) -> list[dict]:
+    # Pydantic includes the submitted value under "input" (e.g. a rejected
+    # password); never echo it back or write it to logs.
+    return [{k: v for k, v in err.items() if k != "input"} for err in errors]
+
+
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     request_id = getattr(request.state, "request_id", None)
+    errors = _sanitize_errors(exc.errors())
 
     logger.warning(
         "validation_error",
         path=request.url.path,
-        errors=exc.errors(),
+        errors=errors,
         request_id=request_id,
     )
 
     return JSONResponse(
         status_code=422,
-        content=jsonable_encoder(
-            {
-                "detail": exc.errors(),
-                "body": exc.body,
-            }
-        ),
+        content=jsonable_encoder({"detail": errors}),
     )
 
 

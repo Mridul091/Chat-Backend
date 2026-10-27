@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.conversation import Conversation
 from app.models.conversation_member import ConversationMember
-from sqlalchemy import select, update
+from sqlalchemy import select, update, distinct
 from sqlalchemy.sql import func
 
 
@@ -29,12 +29,39 @@ class ConversationRepository:
         )
         return result.scalars().all()
 
+    @staticmethod
+    async def get_dm_between(db: AsyncSession, user_a: int, user_b: int):
+        result = await db.execute(
+            select(Conversation)
+            .join(
+                ConversationMember,
+                ConversationMember.conversation_id == Conversation.id,
+            )
+            .where(
+                Conversation.type == "dm",
+                ConversationMember.user_id.in_([user_a, user_b]),
+            )
+            .group_by(Conversation.id)
+            .having(func.count(distinct(ConversationMember.user_id)) == 2)
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def add_member(db: AsyncSession, conversation_id: int, user_id: int):
         member = ConversationMember(conversation_id=conversation_id, user_id=user_id)
         db.add(member)
         await db.commit()
         await db.refresh(member)
         return member
+
+    @staticmethod
+    async def get_member_ids(db: AsyncSession, conversation_id: int) -> set[int]:
+        result = await db.execute(
+            select(ConversationMember.user_id).where(
+                ConversationMember.conversation_id == conversation_id
+            )
+        )
+        return set(result.scalars().all())
 
     @staticmethod
     async def is_member(db: AsyncSession, conversation_id: int, user_id: int) -> bool:

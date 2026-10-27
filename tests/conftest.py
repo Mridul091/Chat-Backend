@@ -4,7 +4,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from app.core.database import Base, get_db
+from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 
 
@@ -14,6 +14,7 @@ from app.models.conversation_member import ConversationMember
 from app.models.message import Message
 
 from app.core.limiter import limiter
+from app.websocket.manager import manager
 limiter.enabled = False
 
 
@@ -35,6 +36,7 @@ async def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_session_factory] = lambda: TestSessionLocal
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -45,6 +47,16 @@ async def setup_db():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest.fixture(autouse=True)
+def reset_ws_manager():
+    """The connection manager is process-global; conversation ids restart each
+    test, so drop any sockets a previous test left registered."""
+    yield
+    manager.rooms.clear()
+    manager.active_users.clear()
+    manager.rate_limits.clear()
 
 
 @pytest_asyncio.fixture
