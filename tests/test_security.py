@@ -12,20 +12,29 @@ from app.services.auth import create_refresh_token
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-async def register(client, email: str, username: str, password: str = "password123") -> int:
-    res = await client.post("/api/v1/auth/register", json={
-        "email": email,
-        "username": username,
-        "password": password,
-    })
+
+async def register(
+    client, email: str, username: str, password: str = "password123"
+) -> int:
+    res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": email,
+            "username": username,
+            "password": password,
+        },
+    )
     return res.json()["id"]
 
 
 async def login(client, email: str, password: str = "password123"):
-    return await client.post("/api/v1/auth/login", json={
-        "email": email,
-        "password": password,
-    })
+    return await client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
 
 
 async def register_and_login(client, email: str, username: str) -> tuple[int, str]:
@@ -69,6 +78,7 @@ def ws_join(tc: TestClient, conversation_id: int, token: str):
 
 # ── 1. WebSocket: non-members cannot join a conversation ─────────────────────
 
+
 @pytest.mark.asyncio
 async def test_ws_non_member_is_rejected(client):
     _, token1 = await register_and_login(client, "u1@test.com", "user1")
@@ -101,6 +111,7 @@ async def test_ws_member_can_join_and_receive_messages(client):
 
 # ── 2. WebSocket: presence only covers the conversation's members ────────────
 
+
 @pytest.mark.asyncio
 async def test_ws_presence_scoped_to_conversation(client):
     user1, token1 = await register_and_login(client, "u1@test.com", "user1")
@@ -124,6 +135,7 @@ async def test_ws_presence_scoped_to_conversation(client):
 
 
 # ── 3. Rate limiting keys on the real client IP behind a trusted proxy ───────
+
 
 @pytest.fixture
 def rate_limiting():
@@ -165,15 +177,19 @@ async def test_forwarded_for_ignored_from_untrusted_peer(rate_limiting):
 
 # ── 4. Validation errors never echo or log submitted values ──────────────────
 
+
 @pytest.mark.asyncio
 async def test_validation_error_does_not_echo_or_log_password(client, caplog):
     secret = "Sh0rt!"
     with caplog.at_level(logging.WARNING):
-        response = await client.post("/api/v1/auth/register", json={
-            "email": "u1@test.com",
-            "username": "user1",
-            "password": secret,
-        })
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "u1@test.com",
+                "username": "user1",
+                "password": secret,
+            },
+        )
     assert response.status_code == 422
     assert secret not in response.text
     assert "body" not in response.json()
@@ -183,6 +199,7 @@ async def test_validation_error_does_not_echo_or_log_password(client, caplog):
 
 
 # ── 5. User lookups don't expose email addresses ─────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_user_endpoints_do_not_expose_email(client):
@@ -202,6 +219,7 @@ async def test_user_endpoints_do_not_expose_email(client):
 
 
 # ── 6a. Creating conversations validates members and is atomic ──────────────
+
 
 @pytest.mark.asyncio
 async def test_create_conversation_unknown_member_creates_nothing(client):
@@ -229,7 +247,10 @@ async def test_create_conversation_dedupes_creator_and_members(client):
 @pytest.mark.parametrize("extra_members", [0, 2])
 async def test_dm_requires_exactly_one_other_member(client, extra_members):
     _, token1 = await register_and_login(client, "u1@test.com", "user1")
-    others = [await register(client, f"o{i}@test.com", f"other{i}") for i in range(extra_members)]
+    others = [
+        await register(client, f"o{i}@test.com", f"other{i}")
+        for i in range(extra_members)
+    ]
 
     response = await create_conversation(client, token1, "dm", others)
     assert response.status_code == 400
@@ -249,6 +270,7 @@ async def test_dm_is_reused_for_the_same_pair(client):
 
 
 # ── 6b. Adding members ───────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_add_member_unknown_user(client):
@@ -321,6 +343,7 @@ async def test_add_member_conversation_not_found(client):
 
 # ── 7. Refresh tokens rotate, can be revoked, and reuse is detected ──────────
 
+
 @pytest.mark.asyncio
 async def test_refresh_rotates_token(client):
     await register(client, "u1@test.com", "user1")
@@ -339,7 +362,9 @@ async def test_refresh_token_reuse_revokes_all_sessions(client):
     await register(client, "u1@test.com", "user1")
     old = refresh_cookie(await login(client, "u1@test.com"))
     other_session = refresh_cookie(await login(client, "u1@test.com"))
-    new = refresh_cookie(await post_with_refresh_cookie(client, "/api/v1/auth/refresh", old))
+    new = refresh_cookie(
+        await post_with_refresh_cookie(client, "/api/v1/auth/refresh", old)
+    )
 
     # Replaying the rotated token is rejected...
     replay = await post_with_refresh_cookie(client, "/api/v1/auth/refresh", old)
