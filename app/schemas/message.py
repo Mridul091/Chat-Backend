@@ -10,6 +10,7 @@ class MessageResponse(BaseModel):
     id: int
     conversation_id: int
     sender_id: int
+    sender_username: str | None = None
     content: str
     created_at: datetime
 

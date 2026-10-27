@@ -4,13 +4,15 @@ import uuid
 from fastapi import FastAPI, Request
 
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from fastapi.exceptions import RequestValidationError
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
-from app.api.v1 import health, auth, conversation
+from app.api.v1 import health, auth, conversation, users
 from app.websocket.router import router as ws_router
 from app.core.limiter import limiter
+from app.core.config import settings
 from app.core.logger import logger
 from structlog.contextvars import bind_contextvars, clear_contextvars
 from app.core.error_handler import (
@@ -70,8 +72,13 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+# Added last so it runs first: rewrites request.client from X-Forwarded-For
+# (only when the peer is a trusted proxy) before logging and rate limiting.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.TRUSTED_PROXIES)
+
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(conversation.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 app.include_router(ws_router)

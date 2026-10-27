@@ -18,6 +18,16 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UserPublic(BaseModel):
+    """What other users may see about a user — no email or other PII."""
+
+    id: int
+    username: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserLogin(BaseModel):
     email: str
     password: str

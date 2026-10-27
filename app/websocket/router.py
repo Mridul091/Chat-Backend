@@ -1,30 +1,42 @@
-from fastapi import WebSocket, WebSocketDisconnect, APIRouter
+from fastapi import WebSocket, WebSocketDisconnect, APIRouter, Depends
 from app.websocket.auth import ws_authenticate
 from app.websocket.manager import manager
-from app.core.database import AsyncSessionLocal
+from app.core.database import get_session_factory
 from app.models.message import Message
 from app.repositories.message import MessageRepository
 from app.repositories.conversation import ConversationRepository
+from app.repositories.user import UserRepository
 
 router = APIRouter()
 
 
 @router.websocket("/ws/{conversation_id}")
-async def websocket_endpoint(ws: WebSocket, conversation_id: int):
+async def websocket_endpoint(
+    ws: WebSocket,
+    conversation_id: int,
+    session_factory=Depends(get_session_factory),
+):
     await ws.accept()
 
     auth_msg = await ws.receive_json()
-    token = auth_msg.get("token")
+    token = auth_msg.get("token") if isinstance(auth_msg, dict) else None
 
     user_id = await ws_authenticate(token)
     if not user_id:
         await ws.close(code=1008)  # Policy Violation
         return
 
+    # Only members may join the room; otherwise they'd receive every broadcast.
+    async with session_factory() as db:
+        member_ids = await ConversationRepository.get_member_ids(db, conversation_id)
+    if user_id not in member_ids:
+        await ws.close(code=1008)
+        return
+
     await manager.connect(ws, conversation_id, user_id)
 
-    # Send the current list of online users to the newly connected client
-    online_users = list(manager.active_users.keys())
+    # Presence is scoped to this conversation's members, not every online user
+    online_users = [uid for uid in member_ids if manager.is_user_online(uid)]
     await ws.send_json({"type": "presence_state", "online_users": online_users})
 
     await manager.broadcast(
@@ -41,7 +53,7 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
                 )
                 continue  # Skip processing this message
 
-            async with AsyncSessionLocal() as db:
+            async with session_factory() as db:
                 if not await ConversationRepository.is_member(
                     db, conversation_id, user_id
                 ):
@@ -74,12 +86,17 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
 
                 saved = await MessageRepository.create_message(db, msg)
 
+                # Fetch sender username to include in the broadcast
+                sender = await UserRepository.get_user_by_id(db, user_id)
+                sender_username = sender.username if sender else None
+
                 await manager.broadcast(
                     conversation_id,
                     {
                         "type": "message",
                         "id": saved.id,
                         "sender_id": user_id,
+                        "sender_username": sender_username,
                         "content": saved.content,
                         "created_at": str(saved.created_at),
                     },

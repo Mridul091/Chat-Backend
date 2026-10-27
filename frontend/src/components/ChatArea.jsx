@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { getMessages, connectWS, markRead } from "../api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { getMessages, connectWS, markRead, getUsers } from "../api";
 
 export default function ChatArea({ conversation, currentUser }) {
   const [messages, setMessages] = useState([]);
@@ -7,6 +7,7 @@ export default function ChatArea({ conversation, currentUser }) {
   const [wsStatus, setWsStatus] = useState("disconnected");
   const [typingUsers, setTypingUsers] = useState(new Set());
   const [onlineUsers, setOnlineUsers] = useState(new Set());
+  const [userCache, setUserCache] = useState({}); // { userId: username }
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatMessagesRef = useRef(null);
@@ -34,6 +35,25 @@ export default function ChatArea({ conversation, currentUser }) {
     getMessages(conversation.id, 100, 0)
       .then((msgs) => {
         setMessages(msgs);
+        // Populate userCache from sender_username already in messages (from DB JOIN)
+        const cache = {};
+        msgs.forEach((m) => {
+          if (m.sender_username) cache[m.sender_id] = m.sender_username;
+        });
+        // Fetch any senders whose username wasn't in the JOIN result
+        const missing = [...new Set(msgs.map((m) => m.sender_id))].filter(
+          (id) => !cache[id]
+        );
+        if (missing.length > 0) {
+          getUsers(missing)
+            .then((users) => {
+              users.forEach((u) => { cache[u.id] = u.username; });
+              setUserCache((prev) => ({ ...prev, ...cache }));
+            })
+            .catch(() => {});
+        } else {
+          setUserCache((prev) => ({ ...prev, ...cache }));
+        }
         markRead(conversation.id).catch(() => {});
       })
       .catch(console.error);
@@ -49,7 +69,7 @@ export default function ChatArea({ conversation, currentUser }) {
     ws.addEventListener("message", (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "message") {
+          if (data.type === "message") {
           setMessages((prev) => {
             if (prev.some((m) => m.id === data.id)) return prev;
             return [
@@ -57,12 +77,17 @@ export default function ChatArea({ conversation, currentUser }) {
               {
                 id: data.id,
                 sender_id: data.sender_id,
+                sender_username: data.sender_username,
                 content: data.content,
                 created_at: data.created_at,
                 conversation_id: conversation.id,
               },
             ];
           });
+          // Cache the username from live WS events too
+          if (data.sender_username) {
+            setUserCache((prev) => ({ ...prev, [data.sender_id]: data.sender_username }));
+          }
         } else if (data.type === "typing_start") {
           if (data.sender_id !== currentUser?.id) {
             setTypingUsers((prev) => new Set(prev).add(data.sender_id));
@@ -249,7 +274,7 @@ export default function ChatArea({ conversation, currentUser }) {
                       gap: "6px",
                     }}
                   >
-                    User #{msg.sender_id}
+                    {msg.sender_username || userCache[msg.sender_id] || `User #${msg.sender_id}`}
                     {onlineUsers.has(msg.sender_id) && (
                       <div
                         style={{
@@ -283,7 +308,7 @@ export default function ChatArea({ conversation, currentUser }) {
           }}
         >
           {typingUsers.size === 1
-            ? `User #${[...typingUsers][0]} is typing...`
+            ? `${userCache[[...typingUsers][0]] || `User #${[...typingUsers][0]}`} is typing...`
             : `${typingUsers.size} people are typing...`}
         </div>
       )}

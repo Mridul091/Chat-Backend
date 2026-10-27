@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { createConversation } from '../api';
+import { createConversation, lookupUsers } from '../api';
 
 export default function CreateConversationModal({ onClose, onCreate }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState('group');
-  const [memberIds, setMemberIds] = useState('');
+  const [usernames, setUsernames] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -14,16 +14,31 @@ export default function CreateConversationModal({ onClose, onCreate }) {
     setLoading(true);
 
     try {
-      const ids = memberIds
+      const inputNames = usernames
         .split(',')
-        .map((id) => parseInt(id.trim(), 10))
-        .filter((id) => !isNaN(id));
+        .map((u) => u.trim())
+        .filter(Boolean);
 
-      const conv = await createConversation(
-        title || null,
-        type,
-        ids
+      if (inputNames.length === 0) {
+        setError('Please enter at least one username.');
+        return;
+      }
+
+      // Resolve usernames → user objects
+      const resolvedUsers = await lookupUsers(inputNames);
+
+      // Check for any usernames that weren't found
+      const foundNames = resolvedUsers.map((u) => u.username.toLowerCase());
+      const notFound = inputNames.filter(
+        (name) => !foundNames.includes(name.toLowerCase())
       );
+      if (notFound.length > 0) {
+        setError(`User(s) not found: ${notFound.join(', ')}`);
+        return;
+      }
+
+      const ids = resolvedUsers.map((u) => u.id);
+      const conv = await createConversation(title || null, type, ids);
       onCreate(conv);
       onClose();
     } catch (err) {
@@ -77,13 +92,13 @@ export default function CreateConversationModal({ onClose, onCreate }) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="conv-members">Member IDs (comma-separated)</label>
+            <label htmlFor="conv-members">Usernames (comma-separated)</label>
             <input
               id="conv-members"
               type="text"
-              placeholder="e.g. 2, 3, 4"
-              value={memberIds}
-              onChange={(e) => setMemberIds(e.target.value)}
+              placeholder="e.g. john, alice, bob"
+              value={usernames}
+              onChange={(e) => setUsernames(e.target.value)}
             />
           </div>
 

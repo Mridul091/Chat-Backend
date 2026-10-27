@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.user import User
 from app.models.message import Message
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
+from app.repositories.user import UserRepository
 from app.schemas.conversation import (
     ConversationCreate,
     ConversationResponse,
@@ -67,9 +69,32 @@ async def add_member(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    conversation = await ConversationRepository.get_conversation_by_id(
+        db, conversation_id
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
     if not await ConversationRepository.is_member(db, conversation_id, current_user.id):
         raise HTTPException(status_code=403, detail="Access denied")
-    await ConversationRepository.add_member(db, conversation_id, data.user_id)
+    if conversation.type == "dm":
+        raise HTTPException(
+            status_code=400, detail="Cannot add members to a direct message"
+        )
+    if conversation.created_by != current_user.id:
+        raise HTTPException(
+            status_code=403, detail="Only the conversation creator can add members"
+        )
+    if not await UserRepository.get_user_by_id(db, data.user_id):
+        raise HTTPException(status_code=404, detail="User not found")
+    if await ConversationRepository.is_member(db, conversation_id, data.user_id):
+        raise HTTPException(status_code=409, detail="User is already a member")
+
+    try:
+        await ConversationRepository.add_member(db, conversation_id, data.user_id)
+    except IntegrityError:
+        # Lost a race with a concurrent add of the same user
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="User is already a member")
     return {"message": "Member added"}
 
 

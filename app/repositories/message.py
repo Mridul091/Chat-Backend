@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.message import Message
+from app.models.user import User
 from sqlalchemy import select
 from datetime import datetime
 from fastapi import HTTPException
@@ -15,14 +16,20 @@ class MessageRepository:
     async def get_messages(
         db: AsyncSession, conversation_id: int, limit: int = 20, offset: int = 0
     ):
-        result = await db.execute(
-            select(Message)
+        stmt = (
+            select(Message, User.username.label("sender_username"))
+            .join(User, User.id == Message.sender_id)
             .where(Message.conversation_id == conversation_id)
             .order_by(Message.created_at.asc())
             .limit(limit)
             .offset(offset)
         )
-        return result.scalars().all()
+        result = await db.execute(stmt)
+        rows = result.all()
+        # Attach sender_username to each Message object so Pydantic can read it
+        for msg, username in rows:
+            msg.sender_username = username
+        return [msg for msg, _ in rows]
 
     @staticmethod
     async def get_messages_since(db: AsyncSession, conversation_id: int, since: str):

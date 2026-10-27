@@ -110,6 +110,18 @@ export async function markRead(conversationId) {
   return request(`/conversations/${conversationId}/read`, { method: 'POST' });
 }
 
+export async function getUsers(ids) {
+  if (!ids || ids.length === 0) return [];
+  // FastAPI list[int] Query requires repeated params: ?user_ids=1&user_ids=2
+  const params = ids.map((id) => `user_ids=${id}`).join('&');
+  return request(`/users/batch?${params}`);
+}
+
+export async function lookupUsers(usernames) {
+  if (!usernames || usernames.length === 0) return [];
+  const params = usernames.map((u) => `usernames=${encodeURIComponent(u)}`).join('&');
+  return request(`/users/lookup?${params}`);
+}
 // WebSocket
 export function connectWS(conversationId) {
   const ws = new WebSocket(`${WS_BASE}/ws/${conversationId}`);

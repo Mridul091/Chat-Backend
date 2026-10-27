@@ -3,16 +3,25 @@ import pytest
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-async def register_and_login(client, email: str, username: str, password: str = "password123") -> str:
-    await client.post("/api/v1/auth/register", json={
-        "email": email,
-        "username": username,
-        "password": password,
-    })
-    res = await client.post("/api/v1/auth/login", json={
-        "email": email,
-        "password": password,
-    })
+
+async def register_and_login(
+    client, email: str, username: str, password: str = "password123"
+) -> str:
+    await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": email,
+            "username": username,
+            "password": password,
+        },
+    )
+    res = await client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": email,
+            "password": password,
+        },
+    )
     return res.json()["access_token"]
 
 
@@ -21,6 +30,7 @@ def auth_header(token: str) -> dict:
 
 
 # ── Create Conversation ─────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_create_conversation_success(client):
@@ -43,7 +53,7 @@ async def test_create_conversation_no_title(client):
     token = await register_and_login(client, "user1@test.com", "user1")
     response = await client.post(
         "/api/v1/conversations/",
-        json={"type": "dm", "member_ids": []},
+        json={"type": "group", "member_ids": []},
         headers=auth_header(token),
     )
     assert response.status_code == 200
@@ -60,6 +70,7 @@ async def test_create_conversation_unauthenticated(client):
 
 
 # ── Create Conversation: Input Validation ────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_create_conversation_invalid_type(client):
@@ -95,6 +106,7 @@ async def test_create_conversation_too_many_members(client):
 
 
 # ── List Conversations ───────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_list_conversations_empty(client):
@@ -136,6 +148,7 @@ async def test_list_conversations_only_own(client):
 
 # ── Get Single Conversation ──────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_conversation_success(client):
     token = await register_and_login(client, "user1@test.com", "user1")
@@ -146,7 +159,9 @@ async def test_get_conversation_success(client):
     )
     conv_id = create_res.json()["id"]
 
-    response = await client.get(f"/api/v1/conversations/{conv_id}", headers=auth_header(token))
+    response = await client.get(
+        f"/api/v1/conversations/{conv_id}", headers=auth_header(token)
+    )
     assert response.status_code == 200
     assert response.json()["id"] == conv_id
 
@@ -163,7 +178,9 @@ async def test_get_conversation_not_member(client):
     )
     conv_id = create_res.json()["id"]
 
-    response = await client.get(f"/api/v1/conversations/{conv_id}", headers=auth_header(token2))
+    response = await client.get(
+        f"/api/v1/conversations/{conv_id}", headers=auth_header(token2)
+    )
     assert response.status_code == 403
 
 
@@ -176,12 +193,18 @@ async def test_get_conversation_not_found(client):
 
 # ── Add Member ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_add_member_success(client):
     token1 = await register_and_login(client, "user1@test.com", "user1")
-    res2 = await client.post("/api/v1/auth/register", json={
-        "email": "user2@test.com", "username": "user2", "password": "password123"
-    })
+    res2 = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "user2@test.com",
+            "username": "user2",
+            "password": "password123",
+        },
+    )
     user2_id = res2.json()["id"]
 
     create_res = await client.post(
@@ -221,6 +244,7 @@ async def test_add_member_not_allowed_if_not_member(client):
 
 
 # ── Send Message ─────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_message_success(client):
@@ -276,6 +300,7 @@ async def test_send_message_unauthenticated(client):
 
 # ── Send Message: Input Validation ───────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_send_message_empty_content(client):
     token = await register_and_login(client, "user1@test.com", "user1")
@@ -313,6 +338,7 @@ async def test_send_message_too_long(client):
 
 
 # ── Get Messages ─────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_messages_empty(client):
@@ -412,6 +438,7 @@ async def test_get_messages_not_member(client):
 
 
 # ── Get Messages: Query Param Validation ─────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_get_messages_limit_too_high(client):
